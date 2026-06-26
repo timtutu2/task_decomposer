@@ -1,0 +1,12 @@
+[
+  {
+    "task": "open the box",
+    "gold_steps": [
+      {"phase": "approach", "target_part": "lid", "contact": "none", "motion": "reach"},
+      {"phase": "contact", "target_part": "lid_edge", "contact": "fingertip_touch", "motion": "none"},
+      {"phase": "grasp", "target_part": "lid_edge", "contact": "index_thumb_to_lid_edge", "motion": "none"},
+      {"phase": "open", "target_part": "lid_edge", "contact": "index_thumb_to_lid_edge", "motion": "object_part_rotation"},
+      {"phase": "release", "target_part": "lid", "contact": "none", "motion": "release"}
+    ]
+  }
+]
