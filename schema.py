@@ -26,10 +26,12 @@ def build_full_sequence_schema() -> dict:
                         "motion": {"type": "string", "enum": MOTION},
                     },
                     "required": ["phase", "target_part", "contact", "motion"],
+                    "additionalProperties": False,
                 },
             }
         },
         "required": ["steps"],
+        "additionalProperties": False,
     }
 
 
@@ -43,4 +45,5 @@ def build_single_row_schema() -> dict:
             "motion": {"type": "string", "enum": MOTION},
         },
         "required": ["target_part", "contact", "motion"],
+        "additionalProperties": False,
     }
