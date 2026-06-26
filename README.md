@@ -80,9 +80,15 @@ pip install -r requirements.txt
 python decomposer.py
 ```
 
-This runs all three modes against the one worked example and prints the
-output of each, so you can eyeball whether the model is even getting the
-right structure before you trust any numbers.
+This runs all three modes against the default worked example (`open the
+box`) and prints the output of each, so you can eyeball whether the model
+is even getting the right structure before you trust any numbers.
+
+To decompose a different task, pass it as the command argument:
+
+```bash
+python decomposer.py "open the drawer"
+```
 
 Then run the eval harness:
 

@@ -11,8 +11,8 @@ Requires:
     ollama pull qwen3.6:27b   (already done before running this)
 """
 
+import argparse
 import json
-import ollama
 from json import JSONDecodeError
 
 from vocab import PHASES
@@ -20,6 +20,13 @@ from schema import build_full_sequence_schema, build_single_row_schema
 from prompts import build_v0_prompt, build_v1_prompt, build_v2_step_prompt
 
 MODEL = "qwen3.6:27b"
+DEFAULT_TASK = "open the box"
+
+
+def _ollama():
+    import ollama
+
+    return ollama
 
 
 def _ollama_value(resp, key: str, default=None):
@@ -54,9 +61,9 @@ def _generate_constrained_json(prompt: str, schema: dict, model: str = MODEL) ->
         "options": {"temperature": 0},
     }
     try:
-        resp = ollama.generate(**kwargs, think=False)
+        resp = _ollama().generate(**kwargs, think=False)
     except TypeError:
-        resp = ollama.generate(**kwargs)
+        resp = _ollama().generate(**kwargs)
 
     text = _ollama_value(resp, "response", "")
     if not text.strip():
@@ -82,7 +89,7 @@ def run_v0(task_text: str, model: str = MODEL) -> str:
     """Free-text generation. Returns raw text for manual inspection --
     no parsing, this is just checking whether the model understands the
     task semantically before you add any scaffolding."""
-    resp = ollama.generate(
+    resp = _ollama().generate(
         model=model,
         prompt=build_v0_prompt(task_text),
         options={"temperature": 0},
@@ -114,8 +121,24 @@ def run_v2(task_text: str, model: str = MODEL) -> dict:
     return {"steps": committed_rows}
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run the Stage 1 decomposer for a hand-object task."
+    )
+    parser.add_argument(
+        "task",
+        nargs="?",
+        default=DEFAULT_TASK,
+        help=f'Task text to decompose. Defaults to "{DEFAULT_TASK}".',
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    task = "open the box"
+    args = parse_args()
+    task = args.task
+
+    print(f"Task: {task}\n")
 
     print("=== v0 (free text) ===")
     print(run_v0(task))
