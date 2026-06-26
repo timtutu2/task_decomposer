@@ -19,7 +19,7 @@ from vocab import PHASES
 from schema import build_full_sequence_schema, build_single_row_schema
 from prompts import build_v0_prompt, build_v1_prompt, build_v2_step_prompt
 
-MODEL = "qwen3.6:27b"
+MODEL = "qwen3:8b"
 DEFAULT_TASK = "open the box"
 
 
