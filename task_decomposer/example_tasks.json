@@ -1,12 +1,12 @@
 [
   {
-    "task": "open the box",
+    "task": "pick the object and rotate the object",
     "gold_steps": [
-      {"phase": "approach", "target_part": "lid", "contact": "none", "motion": "reach"},
-      {"phase": "contact", "target_part": "lid_edge", "contact": "fingertip_touch", "motion": "none"},
-      {"phase": "grasp", "target_part": "lid_edge", "contact": "index_thumb_to_lid_edge", "motion": "none"},
-      {"phase": "open", "target_part": "lid_edge", "contact": "index_thumb_to_lid_edge", "motion": "object_part_rotation"},
-      {"phase": "release", "target_part": "lid", "contact": "none", "motion": "release"}
+      {"phase": "approach", "target_part": "object", "contact": "none", "motion": "reach"},
+      {"phase": "contact", "target_part": "object_surface", "contact": "fingertip_touch", "motion": "none"},
+      {"phase": "grasp", "target_part": "object", "contact": "full_grasp", "motion": "none"},
+      {"phase": "pick", "target_part": "object", "contact": "full_grasp", "motion": "lift"},
+      {"phase": "rotate", "target_part": "object", "contact": "full_grasp", "motion": "object_rotation"}
     ]
   }
 ]

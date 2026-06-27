@@ -31,15 +31,16 @@ def load_gold(path: str):
 
 
 def score_one(pred_steps, gold_steps):
-    """Per-slot accuracy for a single task. Assumes matching phase
-    order/count between prediction and gold (true while PHASES is fixed
-    at 5; revisit if you move to variable-length rows)."""
+    """Per-slot accuracy, counting missing or extra rows as incorrect."""
     correct = {s: 0 for s in SLOTS}
     total = {s: 0 for s in SLOTS}
-    for pred_row, gold_row in zip(pred_steps, gold_steps):
+    row_count = max(len(pred_steps), len(gold_steps))
+    for index in range(row_count):
+        pred_row = pred_steps[index] if index < len(pred_steps) else {}
+        gold_row = gold_steps[index] if index < len(gold_steps) else {}
         for s in SLOTS:
             total[s] += 1
-            if pred_row.get(s) == gold_row.get(s):
+            if s in pred_row and s in gold_row and pred_row[s] == gold_row[s]:
                 correct[s] += 1
     return correct, total
 

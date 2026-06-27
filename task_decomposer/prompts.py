@@ -6,7 +6,10 @@ build out your gold set -- SayCan's own ablations showed planning
 accuracy is sensitive to the number of in-context examples.
 """
 
-FEWSHOT_HEADER = """You are decomposing a hand-object manipulation task into a fixed sequence of 5 generic phases: approach, contact, grasp, open, release.
+FEWSHOT_HEADER = """You are decomposing a hand-object manipulation task into a sequence of task-specific phases.
+
+Choose as many phases as the task actually needs. Use concise phase names and
+do not add empty padding phases.
 
 For each phase, fill in:
 - target_part: which part of the object is involved (or "none")
@@ -17,13 +20,13 @@ Use ONLY the vocabulary you've been given. If a phase doesn't apply meaningfully
 
 Example:
 
-Task: open the box
+Task: pick the object and rotate the object
 
-1. approach - target_part: lid - contact: none - motion: reach
-2. contact - target_part: lid_edge - contact: fingertip_touch - motion: none
-3. grasp - target_part: lid_edge - contact: index_thumb_to_lid_edge - motion: none
-4. open - target_part: lid_edge - contact: index_thumb_to_lid_edge - motion: object_part_rotation
-5. release - target_part: lid - contact: none - motion: release
+1. approach - target_part: object - contact: none - motion: reach
+2. contact - target_part: object_surface - contact: fingertip_touch - motion: none
+3. grasp - target_part: object - contact: full_grasp - motion: none
+4. pick - target_part: object - contact: full_grasp - motion: lift
+5. rotate - target_part: object - contact: full_grasp - motion: object_rotation
 
 Now do the same for the new task.
 """
@@ -39,7 +42,17 @@ def build_v1_prompt(task_text: str) -> str:
     return (
         f"{FEWSHOT_HEADER}\n"
         f"Task: {task_text}\n\n"
-        f"Respond with the 5-phase decomposition as JSON matching the schema."
+        f"Respond with the complete variable-length decomposition as JSON matching the schema."
+    )
+
+
+def build_phase_plan_prompt(task_text: str) -> str:
+    """Choose the task-specific phase names used by sequential v2."""
+    return (
+        "Choose the ordered phases needed to perform this hand-object task. "
+        "Use as many phases as necessary, with concise phase names and no "
+        f"padding phases.\n\nTask: {task_text}\n\n"
+        'Respond as JSON with a single "phases" array.'
     )
 
 

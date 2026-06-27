@@ -15,12 +15,20 @@ import argparse
 import json
 from json import JSONDecodeError
 
-from vocab import PHASES
-from schema import build_full_sequence_schema, build_single_row_schema
-from prompts import build_v0_prompt, build_v1_prompt, build_v2_step_prompt
+from schema import (
+    build_full_sequence_schema,
+    build_phase_plan_schema,
+    build_single_row_schema,
+)
+from prompts import (
+    build_phase_plan_prompt,
+    build_v0_prompt,
+    build_v1_prompt,
+    build_v2_step_prompt,
+)
 
 MODEL = "qwen3:8b"
-DEFAULT_TASK = "open the box"
+DEFAULT_TASK = "pick the object and rotate the object"
 
 
 def _ollama():
@@ -98,7 +106,7 @@ def run_v0(task_text: str, model: str = MODEL) -> str:
 
 
 def run_v1(task_text: str, model: str = MODEL) -> dict:
-    """Single-shot, all 5 rows in one call, JSON-schema constrained.
+    """Single-shot, all variable-length rows in one constrained call.
     Guaranteed-valid output: every slot value is from your closed vocab."""
     return _generate_constrained_json(
         prompt=build_v1_prompt(task_text),
@@ -108,12 +116,18 @@ def run_v1(task_text: str, model: str = MODEL) -> dict:
 
 
 def run_v2(task_text: str, model: str = MODEL) -> dict:
-    """Sequential, one phase at a time, each call schema-constrained.
+    """Plan free-form phases, then generate each row with slot constraints.
+
     Each phase's prompt includes the phases already committed, so later
     decisions can condition on earlier ones."""
+    plan = _generate_constrained_json(
+        prompt=build_phase_plan_prompt(task_text),
+        schema=build_phase_plan_schema(),
+        model=model,
+    )
     committed_rows = []
     schema = build_single_row_schema()
-    for phase in PHASES:
+    for phase in plan["phases"]:
         prompt = build_v2_step_prompt(task_text, committed_rows, phase)
         row = _generate_constrained_json(prompt=prompt, schema=schema, model=model)
         row["phase"] = phase
