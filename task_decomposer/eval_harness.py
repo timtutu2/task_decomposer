@@ -6,7 +6,7 @@ Gold set format (JSON list) -- see example_tasks.json:
   {
     "task": "open the box",
     "gold_steps": [
-      {"phase": "approach", "target_part": "lid", "contact": "none", "motion": "reach"},
+      {"phase": "approach", "target_part": "lid", "hand_part": "none", "motion": "reach"},
       ...
     ]
   },
@@ -22,7 +22,7 @@ once at the end.
 import json
 from decomposer import run_v1, run_v2
 
-SLOTS = ["target_part", "contact", "motion"]
+SLOTS = ["target_part", "hand_part", "motion"]
 
 
 def load_gold(path: str):

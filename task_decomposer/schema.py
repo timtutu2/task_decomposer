@@ -1,11 +1,11 @@
 """
 Builds the JSON schema passed as `format=` to ollama.generate()/chat().
 Ollama grammar-constrains output to match this schema, so target_part /
-contact / motion can only ever be values from your closed vocabulary --
+hand_part / motion can only ever be values from your closed vocabulary --
 no parsing, no hallucinated slot values.
 """
 
-from vocab import TARGET_PART, CONTACT, MOTION
+from vocab import TARGET_PART, HAND_PART, MOTION
 
 MAX_STEPS = 20
 
@@ -32,10 +32,10 @@ def build_full_sequence_schema() -> dict:
                             "enum": TARGET_PART,
                             "description": "The object or object region being acted on.",
                         },
-                        "contact": {
+                        "hand_part": {
                             "type": "string",
-                            "enum": CONTACT,
-                            "description": "The hand-object contact relation.",
+                            "enum": HAND_PART,
+                            "description": "Which part of the hand is contacting the object.",
                         },
                         "motion": {
                             "type": "string",
@@ -43,7 +43,7 @@ def build_full_sequence_schema() -> dict:
                             "description": "The hand or object motion in this phase.",
                         },
                     },
-                    "required": ["phase", "target_part", "contact", "motion"],
+                    "required": ["phase", "target_part", "hand_part", "motion"],
                     "additionalProperties": False,
                 },
             }
@@ -59,10 +59,10 @@ def build_single_row_schema() -> dict:
         "type": "object",
         "properties": {
             "target_part": {"type": "string", "enum": TARGET_PART},
-            "contact": {"type": "string", "enum": CONTACT},
+            "hand_part": {"type": "string", "enum": HAND_PART},
             "motion": {"type": "string", "enum": MOTION},
         },
-        "required": ["target_part", "contact", "motion"],
+        "required": ["target_part", "hand_part", "motion"],
         "additionalProperties": False,
     }
 

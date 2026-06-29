@@ -2,11 +2,11 @@
   {
     "task": "pick the object and rotate the object",
     "gold_steps": [
-      {"phase": "approach", "target_part": "object", "contact": "none", "motion": "reach"},
-      {"phase": "contact", "target_part": "object_surface", "contact": "fingertip_touch", "motion": "none"},
-      {"phase": "grasp", "target_part": "object", "contact": "full_grasp", "motion": "none"},
-      {"phase": "pick", "target_part": "object", "contact": "full_grasp", "motion": "lift"},
-      {"phase": "rotate", "target_part": "object", "contact": "full_grasp", "motion": "object_rotation"}
+      {"phase": "approach", "target_part": "object", "hand_part": "none", "motion": "reach"},
+      {"phase": "touch", "target_part": "object_surface", "hand_part": "fingertip", "motion": "none"},
+      {"phase": "grasp", "target_part": "object", "hand_part": "power_grasp", "motion": "grasp_close"},
+      {"phase": "pick", "target_part": "object", "hand_part": "power_grasp", "motion": "lift"},
+      {"phase": "rotate", "target_part": "object", "hand_part": "power_grasp", "motion": "object_rotation"}
     ]
   }
 ]

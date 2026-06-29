@@ -14,13 +14,13 @@ PLAN = {
         {
             "phase": "approach",
             "target_part": "object",
-            "contact": "none",
+            "hand_part": "none",
             "motion": "reach",
         },
         {
             "phase": "grasp",
             "target_part": "object",
-            "contact": "full_grasp",
+            "hand_part": "power_grasp",
             "motion": "none",
         },
     ]
@@ -53,7 +53,7 @@ def test_load_hoisdf_history(tmp_path):
 
 def test_free_text_decomposer_output():
     plan = normalize_plan(
-        "1. approach - target_part: object - contact: none - motion: reach\n"
-        "2. grasp - target_part: object - contact: full_grasp - motion: none"
+        "1. approach - target_part: object - hand_part: none - motion: reach\n"
+        "2. grasp - target_part: object - hand_part: power_grasp - motion: none"
     )
     assert [row["phase"] for row in plan] == ["approach", "grasp"]

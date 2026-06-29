@@ -13,7 +13,7 @@ do not add empty padding phases.
 
 For each phase, fill in:
 - target_part: which part of the object is involved (or "none")
-- contact: the hand-object contact relation at this phase (or "none")
+- hand_part: which part of the hand is contacting the object (or "none")
 - motion: the motion happening at this phase (or "none")
 
 Use ONLY the vocabulary you've been given. If a phase doesn't apply meaningfully to this task, use "none" for its slots rather than guessing.
@@ -22,11 +22,11 @@ Example:
 
 Task: pick the object and rotate the object
 
-1. approach - target_part: object - contact: none - motion: reach
-2. contact - target_part: object_surface - contact: fingertip_touch - motion: none
-3. grasp - target_part: object - contact: full_grasp - motion: none
-4. pick - target_part: object - contact: full_grasp - motion: lift
-5. rotate - target_part: object - contact: full_grasp - motion: object_rotation
+1. approach - target_part: object - hand_part: none - motion: reach
+2. touch - target_part: object_surface - hand_part: fingertip - motion: none
+3. grasp - target_part: object - hand_part: power_grasp - motion: grasp_close
+4. pick - target_part: object - hand_part: power_grasp - motion: lift
+5. rotate - target_part: object - hand_part: power_grasp - motion: object_rotation
 
 Now do the same for the new task.
 """
@@ -50,8 +50,19 @@ def build_phase_plan_prompt(task_text: str) -> str:
     """Choose the task-specific phase names used by sequential v2."""
     return (
         "Choose the ordered phases needed to perform this hand-object task. "
-        "Use as many phases as necessary, with concise phase names and no "
-        f"padding phases.\n\nTask: {task_text}\n\n"
+        "Use as many phases as the task actually requires — one phase if it "
+        "describes a single ongoing action, more if the task has distinct "
+        "sequential steps. Use concise phase names and no padding phases.\n\n"
+        "Examples:\n\n"
+        'Task: the hand is rotating the object with fingertips\n'
+        '{"phases": ["rotate"]}\n\n'
+        'Task: the hand has pinched the carton and is rotating it via wrist rotation\n'
+        '{"phases": ["rotate"]}\n\n'
+        'Task: pick the object and place it on the shelf\n'
+        '{"phases": ["reach", "grasp", "lift", "place"]}\n\n'
+        'Task: open the drawer and take out the bottle\n'
+        '{"phases": ["reach", "pull_drawer", "grasp_bottle", "lift_bottle", "retract"]}\n\n'
+        f"Task: {task_text}\n"
         'Respond as JSON with a single "phases" array.'
     )
 
@@ -63,7 +74,7 @@ def build_v2_step_prompt(task_text: str, committed_rows: list, next_phase: str) 
     if committed_rows:
         committed_str = "\n".join(
             f"{i + 1}. {r['phase']} - target_part: {r['target_part']} - "
-            f"contact: {r['contact']} - motion: {r['motion']}"
+            f"hand_part: {r['hand_part']} - motion: {r['motion']}"
             for i, r in enumerate(committed_rows)
         )
         committed_block = f"\nDecided so far:\n{committed_str}\n"
@@ -75,5 +86,7 @@ def build_v2_step_prompt(task_text: str, committed_rows: list, next_phase: str) 
         f"Task: {task_text}\n"
         f"{committed_block}\n"
         f"Now decide ONLY the '{next_phase}' phase. "
-        f"Respond with JSON for target_part, contact, and motion for this phase."
+        f"Respond with JSON for target_part, hand_part, and motion for this phase. "
+        f"hand_part is the region of the hand contacting the object (e.g. fingertip, power_grasp), "
+        f"NOT the joint driving the motion."
     )

@@ -10,11 +10,11 @@ import torch
 from torch import Tensor, nn
 
 
-FIELDS = ("phase", "target_part", "contact", "motion")
+FIELDS = ("phase", "target_part", "hand_part", "motion")
 FREE_TEXT_ROW = re.compile(
     r"^\s*(?:\d+[.)]\s*)?(?P<phase>[^-]+?)\s*-\s*"
     r"target_part:\s*(?P<target_part>[^-]+?)\s*-\s*"
-    r"contact:\s*(?P<contact>[^-]+?)\s*-\s*"
+    r"hand_part:\s*(?P<hand_part>[^-]+?)\s*-\s*"
     r"motion:\s*(?P<motion>.+?)\s*$"
 )
 
