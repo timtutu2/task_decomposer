@@ -141,7 +141,7 @@ def main() -> None:
     batch_size = cfg["batch_size"]
     lr         = cfg["lr"]
     save_every = cfg["save_every"]
-    output     = ROOT / cfg["output"]
+    output     = ROOT / "checkpoints" / cfg["output"]
     obj_weight = cfg["obj_weight"]
 
     print(f"Config: {args.config}")
