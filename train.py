@@ -158,7 +158,16 @@ def main() -> None:
         print(f"Resumed from {args.checkpoint}")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.MSELoss()
+
+    # Weight tensor: 1.0 for hand joints (0:63), 10.0 for object dims (63:69).
+    # Hand joints (63 values) otherwise dominate the MSE gradient, leaving the
+    # 6 object dims (axis-angle + translation) undertrained.
+    _dim_weights = torch.ones(69)
+    _dim_weights[63:] = 10.0
+
+    def weighted_mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        w = _dim_weights.to(pred.device)
+        return ((pred - target) ** 2 * w).mean()
 
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -171,7 +180,7 @@ def main() -> None:
             output  = model(pred, plans)
             refined = pred + output.pose_delta
 
-            loss = criterion(refined, gt)
+            loss = weighted_mse(refined, gt)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
