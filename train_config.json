@@ -1,6 +1,6 @@
 {
   "horizon":    5,
-  "epochs":     50,
+  "epochs":     300,
   "batch_size": 64,
   "lr":         1e-4,
   "save_every": 10,
