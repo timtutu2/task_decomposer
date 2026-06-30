@@ -16,7 +16,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
 ROOT = Path(__file__).resolve().parent
@@ -125,51 +124,59 @@ def collate_fn(batch):
 
 
 def main() -> None:
-    _cfg = json.loads((ROOT / "dataset.json").read_text())
-    default_ho3d_root = Path(_cfg["ho3d"]["root"])
+    dataset_cfg = json.loads((ROOT / "dataset.json").read_text())
+    default_ho3d_root = Path(dataset_cfg["ho3d"]["root"])
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ho3d-root",   type=Path,  default=default_ho3d_root)
-    parser.add_argument("--horizon",     type=int,   default=5)
-    parser.add_argument("--epochs",      type=int,   default=50)
-    parser.add_argument("--batch-size",  type=int,   default=32)
-    parser.add_argument("--lr",          type=float, default=1e-4)
-    parser.add_argument("--checkpoint",  type=Path,  default=None,  help="Resume from checkpoint")
-    parser.add_argument("--output",      type=Path,  default=ROOT / "checkpoints")
-    parser.add_argument("--save-every",  type=int,   default=10,    help="Save checkpoint every N epochs")
-    parser.add_argument("--device",      default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--config",     type=Path, default=ROOT / "train_config.json",
+                        help="Training config JSON (default: train_config.json)")
+    parser.add_argument("--ho3d-root",  type=Path, default=default_ho3d_root)
+    parser.add_argument("--checkpoint", type=Path, default=None, help="Resume from checkpoint")
+    parser.add_argument("--device",     default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
-    args.output.mkdir(exist_ok=True)
+    cfg = json.loads(args.config.read_text())
+    horizon    = cfg["horizon"]
+    epochs     = cfg["epochs"]
+    batch_size = cfg["batch_size"]
+    lr         = cfg["lr"]
+    save_every = cfg["save_every"]
+    output     = ROOT / cfg["output"]
+    obj_weight = cfg["obj_weight"]
 
-    dataset = SegmentDataset(PLANS_DIR, PREDS_DIR, args.ho3d_root, args.horizon)
+    print(f"Config: {args.config}")
+    for k, v in cfg.items():
+        print(f"  {k}: {v}")
+
+    output.mkdir(exist_ok=True)
+
+    dataset = SegmentDataset(PLANS_DIR, PREDS_DIR, args.ho3d_root, horizon)
     loader  = DataLoader(
         dataset,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=0,   # data is pre-loaded into RAM; workers would copy tensors
         collate_fn=collate_fn,
     )
 
-    model     = CrossAttentionAdaLNZero().to(args.device)
+    model = CrossAttentionAdaLNZero().to(args.device)
     if args.checkpoint:
         state = torch.load(args.checkpoint, map_location=args.device, weights_only=True)
         model.load_state_dict(state)
         print(f"Resumed from {args.checkpoint}")
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    # Weight tensor: 1.0 for hand joints (0:63), 10.0 for object dims (63:69).
-    # Hand joints (63 values) otherwise dominate the MSE gradient, leaving the
-    # 6 object dims (axis-angle + translation) undertrained.
+    # obj_weight upweights dims 63:69 (axis-angle + translation) relative to
+    # the 63 hand-joint dims, which otherwise dominate the MSE gradient.
     _dim_weights = torch.ones(69)
-    _dim_weights[63:] = 10.0
+    _dim_weights[63:] = obj_weight
 
     def weighted_mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         w = _dim_weights.to(pred.device)
         return ((pred - target) ** 2 * w).mean()
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(1, epochs + 1):
         model.train()
         total_loss = 0.0
 
@@ -188,14 +195,14 @@ def main() -> None:
             total_loss += loss.item()
 
         avg_loss = total_loss / len(loader)
-        print(f"Epoch {epoch:03d}/{args.epochs}  loss={avg_loss:.6f}")
+        print(f"Epoch {epoch:03d}/{epochs}  loss={avg_loss:.6f}")
 
-        if epoch % args.save_every == 0:
-            ckpt = args.output / f"epoch_{epoch:03d}.pt"
+        if epoch % save_every == 0:
+            ckpt = output / f"epoch_{epoch:03d}.pt"
             torch.save(model.state_dict(), ckpt)
             print(f"  → saved {ckpt}")
 
-    final = args.output / "final.pt"
+    final = output / "final.pt"
     torch.save(model.state_dict(), final)
     print(f"Done. Final checkpoint → {final}")
 
