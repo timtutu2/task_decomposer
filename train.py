@@ -148,7 +148,7 @@ def main() -> None:
     for k, v in cfg.items():
         print(f"  {k}: {v}")
 
-    output.mkdir(exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
 
     dataset = SegmentDataset(PLANS_DIR, PREDS_DIR, args.ho3d_root, horizon)
     loader  = DataLoader(
@@ -184,8 +184,8 @@ def main() -> None:
             pred = pred.to(args.device)  # (B, H, 69)
             gt   = gt.to(args.device)    # (B, H, 69)
 
-            output  = model(pred, plans)
-            refined = pred + output.pose_delta
+            model_out = model(pred, plans)
+            refined   = pred + model_out.pose_delta
 
             loss = weighted_mse(refined, gt)
             optimizer.zero_grad()
