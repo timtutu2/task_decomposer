@@ -133,12 +133,14 @@ def main() -> None:
     parser.add_argument("--ho3d-root",  type=Path, default=default_ho3d_root)
     parser.add_argument("--checkpoint", type=Path, default=None, help="Resume from checkpoint")
     parser.add_argument("--device",     default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="Override batch_size from the training config")
     args = parser.parse_args()
 
     cfg = json.loads(args.config.read_text())
     horizon    = cfg["horizon"]
     epochs     = cfg["epochs"]
-    batch_size = cfg["batch_size"]
+    batch_size = args.batch_size if args.batch_size is not None else cfg["batch_size"]
     lr         = cfg["lr"]
     save_every = cfg["save_every"]
     output     = ROOT / "checkpoints" / cfg["output"]
@@ -146,6 +148,8 @@ def main() -> None:
 
     print(f"Config: {args.config}")
     for k, v in cfg.items():
+        if k == "batch_size":
+            v = batch_size
         print(f"  {k}: {v}")
 
     output.mkdir(parents=True, exist_ok=True)
