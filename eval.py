@@ -10,7 +10,7 @@ Reports HOISDF (no refinement) vs Refined (HOISDF + model delta).
 Note: hand MJE is omitted because test-set GT only provides the wrist joint.
 
 Usage:
-    python eval.py checkpoints/final.pt
+    python eval.py checkpoints/v3_without_pool/epoch_100.pt
     python eval.py checkpoints/epoch_050.pt --horizon 5 --device cpu
 """
 

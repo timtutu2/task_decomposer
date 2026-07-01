@@ -4,7 +4,7 @@
 Usage:
     python train.py
     python train.py --epochs 100 --batch-size 64 --lr 3e-4
-    python train.py --checkpoint checkpoints/epoch_050.pt  # resume
+    python train.py --checkpoint checkpoints/v3_without_pool/epoch_100.pt  # resume
 """
 
 from __future__ import annotations
@@ -184,11 +184,16 @@ def main() -> None:
             pred = pred.to(args.device)  # (B, H, 69)
             gt   = gt.to(args.device)    # (B, H, 69)
 
-            model_out = model(pred, plans)
-            refined   = pred + model_out.pose_delta
+            with torch.autocast(
+                device_type="cuda",
+                dtype=torch.bfloat16,
+                enabled=pred.device.type == "cuda",
+            ):
+                model_out = model(pred, plans)
+                refined   = pred + model_out.pose_delta
+                loss = weighted_mse(refined, gt)
 
-            loss = weighted_mse(refined, gt)
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
 
