@@ -24,6 +24,28 @@ sys.path.insert(0, str(ROOT))
 from ca_block import CrossAttentionAdaLNZero
 from ca_block.pose_adapter import _rotation_matrix_to_axis_angle
 
+
+def _aa_to_rotmat(aa: torch.Tensor) -> torch.Tensor:
+    """Batch axis-angle (..., 3) → rotation matrix (..., 3, 3) via Rodrigues."""
+    angle = aa.norm(dim=-1, keepdim=True).clamp(min=1e-7)
+    axis  = aa / angle
+    cos, sin = angle.cos(), angle.sin()
+    x, y, z  = axis.unbind(-1)
+    zero = torch.zeros_like(x)
+    K = torch.stack([zero, -z, y, z, zero, -x, -y, x, zero], dim=-1)
+    K = K.reshape(*aa.shape[:-1], 3, 3)
+    I = torch.eye(3, device=aa.device, dtype=aa.dtype).expand(*aa.shape[:-1], 3, 3)
+    outer = axis.unsqueeze(-1) * axis.unsqueeze(-2)
+    return cos[..., None] * I + sin[..., None] * K + (1 - cos)[..., None] * outer
+
+
+def _geodesic_loss(pred_aa: torch.Tensor, gt_aa: torch.Tensor) -> torch.Tensor:
+    """Mean geodesic rotation error between two sets of axis-angle vectors (..., 3)."""
+    R_pred = _aa_to_rotmat(pred_aa.float())
+    R_gt   = _aa_to_rotmat(gt_aa.float())
+    trace  = (R_pred.transpose(-1, -2) @ R_gt).diagonal(dim1=-2, dim2=-1).sum(-1)
+    return ((trace - 1.0) / 2.0).clamp(-1.0, 1.0).acos().mean()
+
 PLANS_DIR = ROOT / "preprocess" / "plans"       / "ho3d" / "train"
 PREDS_DIR = ROOT / "preprocess" / "hoisdf_preds" / "ho3d" / "train"
 
@@ -144,7 +166,8 @@ def main() -> None:
     lr         = cfg["lr"]
     save_every = cfg["save_every"]
     output     = ROOT / "checkpoints" / cfg["output"]
-    obj_weight = cfg["obj_weight"]
+    rot_weight   = cfg["rot_weight"]
+    trans_weight = cfg["trans_weight"]
 
     print(f"Config: {args.config}")
     for k, v in cfg.items():
@@ -164,23 +187,31 @@ def main() -> None:
     )
 
     model = CrossAttentionAdaLNZero().to(args.device)
-    if args.checkpoint:
-        state = torch.load(args.checkpoint, map_location=args.device, weights_only=True)
-        model.load_state_dict(state)
-        print(f"Resumed from {args.checkpoint}")
-
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    # obj_weight upweights dims 63:69 (axis-angle + translation) relative to
-    # the 63 hand-joint dims, which otherwise dominate the MSE gradient.
-    _dim_weights = torch.ones(69)
-    _dim_weights[63:] = obj_weight
+    start_epoch = 1
+    best_loss   = float("inf")
 
-    def weighted_mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        w = _dim_weights.to(pred.device)
-        return ((pred - target) ** 2 * w).mean()
+    if args.checkpoint:
+        ckpt_data = torch.load(args.checkpoint, map_location=args.device, weights_only=True)
+        if isinstance(ckpt_data, dict) and "model" in ckpt_data:
+            model.load_state_dict(ckpt_data["model"])
+            optimizer.load_state_dict(ckpt_data["optimizer"])
+            start_epoch = ckpt_data["epoch"] + 1
+            best_loss   = ckpt_data.get("best_loss", float("inf"))
+            print(f"Resumed from {args.checkpoint} (epoch {ckpt_data['epoch']}, best_loss={best_loss:.6f})")
+        else:
+            # legacy checkpoint — state dict only
+            model.load_state_dict(ckpt_data)
+            print(f"Resumed from {args.checkpoint} (legacy format, epoch unknown — starting epoch counter at 1)")
 
-    for epoch in range(1, epochs + 1):
+    def pose_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        hand_loss  = ((pred[..., :63]  - target[..., :63])  ** 2).mean()
+        rot_loss   = _geodesic_loss(pred[..., 63:66], target[..., 63:66])
+        trans_loss = ((pred[..., 66:69] - target[..., 66:69]) ** 2).mean()
+        return hand_loss + rot_weight * rot_loss + trans_weight * trans_loss
+
+    for epoch in range(start_epoch, epochs + 1):
         model.train()
         total_loss = 0.0
 
@@ -195,7 +226,7 @@ def main() -> None:
             ):
                 model_out = model(pred, plans)
                 refined   = pred + model_out.pose_delta
-                loss = weighted_mse(refined, gt)
+                loss = pose_loss(refined, gt)
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -204,16 +235,31 @@ def main() -> None:
             total_loss += loss.item()
 
         avg_loss = total_loss / len(loader)
-        print(f"Epoch {epoch:03d}/{epochs}  loss={avg_loss:.6f}")
+        is_best  = avg_loss < best_loss
+
+        if is_best:
+            best_loss = avg_loss
+
+        print(f"Epoch {epoch:03d}/{epochs}  loss={avg_loss:.6f}  best={best_loss:.6f}" + (" *" if is_best else ""))
+
+        bundle = {
+            "model":      model.state_dict(),
+            "optimizer":  optimizer.state_dict(),
+            "epoch":      epoch,
+            "best_loss":  best_loss,
+        }
+
+        if is_best:
+            torch.save(bundle, output / "best.pt")
 
         if epoch % save_every == 0:
             ckpt = output / f"epoch_{epoch:03d}.pt"
-            torch.save(model.state_dict(), ckpt)
+            torch.save(bundle, ckpt)
             print(f"  → saved {ckpt}")
 
     final = output / "final.pt"
-    torch.save(model.state_dict(), final)
-    print(f"Done. Final checkpoint → {final}")
+    torch.save(bundle, final)
+    print(f"Done. Final checkpoint → {final}  (best_loss={best_loss:.6f})")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,10 @@
 {
-  "horizon":    5,
-  "epochs":     300,
-  "batch_size": 128,
-  "lr":         1e-4,
-  "save_every": 10,
-  "output":     "v3_without_pool",
-  "obj_weight": 10.0
+  "horizon":      5,
+  "epochs":       300,
+  "batch_size":   128,
+  "lr":           1e-4,
+  "save_every":   10,
+  "output":       "v4_geodesic",
+  "rot_weight":   1.0,
+  "trans_weight": 10.0
 }
