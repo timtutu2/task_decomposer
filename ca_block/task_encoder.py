@@ -49,6 +49,26 @@ def normalize_plan(plan: Any) -> list[dict[str, str]]:
     return normalized
 
 
+def _bucket(value: str, num_buckets: int) -> int:
+    """Map a string deterministically to an embedding-table row."""
+    result = 2166136261
+    for byte in value.encode("utf-8"):
+        result = (result ^ byte) * 16777619 & 0xFFFFFFFF
+    return result % num_buckets
+
+
+def encode_plan(plan: Any, num_buckets: int = 4096) -> Tensor:
+    """Convert a structured plan to precomputed bucket IDs shaped [steps, fields]."""
+    rows = normalize_plan(plan)
+    return torch.tensor(
+        [
+            [_bucket(row[field], num_buckets) for field in FIELDS]
+            for row in rows
+        ],
+        dtype=torch.long,
+    )
+
+
 class StructuredTaskEncoder(nn.Module):
     """Learnable, dependency-free encoder for decomposer slot values.
 
@@ -67,23 +87,41 @@ class StructuredTaskEncoder(nn.Module):
         self.norm = nn.LayerNorm(d_model)
 
     def _bucket(self, value: str) -> int:
-        # FNV-1a is deterministic across processes (unlike Python's hash()).
-        result = 2166136261
-        for byte in value.encode("utf-8"):
-            result = (result ^ byte) * 16777619 & 0xFFFFFFFF
-        return result % self.num_buckets
+        return _bucket(value, self.num_buckets)
 
-    def forward(self, plans: Sequence[Any], device: torch.device) -> tuple[Tensor, Tensor]:
-        rows = [normalize_plan(plan) for plan in plans]
-        max_steps = max(len(plan) for plan in rows)
-        memory = torch.zeros(len(rows), max_steps, self.norm.normalized_shape[0], device=device)
-        padding_mask = torch.ones(len(rows), max_steps, dtype=torch.bool, device=device)
-        for batch_index, plan in enumerate(rows):
-            for step_index, step in enumerate(plan):
-                token = memory.new_zeros(memory.shape[-1])
-                for field_index, field in enumerate(FIELDS):
-                    bucket = torch.tensor(self._bucket(step[field]), device=device)
-                    token = token + self.field_scale[field_index] * self.embeddings[field](bucket)
-                memory[batch_index, step_index] = self.norm(token)
-                padding_mask[batch_index, step_index] = False
-        return memory, padding_mask
+    def forward(
+        self,
+        plans: Sequence[Any] | Tensor,
+        device: torch.device,
+        padding_mask: Tensor | None = None,
+    ) -> tuple[Tensor, Tensor]:
+        if isinstance(plans, Tensor):
+            plan_ids = plans.to(device)
+            if plan_ids.ndim != 3 or plan_ids.shape[-1] != len(FIELDS):
+                raise ValueError("encoded plans must have shape [batch, steps, 4]")
+            if padding_mask is None:
+                raise ValueError("padding_mask is required for encoded plans")
+            padding_mask = padding_mask.to(device)
+        else:
+            encoded = [encode_plan(plan, self.num_buckets) for plan in plans]
+            max_steps = max(ids.shape[0] for ids in encoded)
+            plan_ids = torch.zeros(
+                len(encoded), max_steps, len(FIELDS), dtype=torch.long, device=device
+            )
+            padding_mask = torch.ones(
+                len(encoded), max_steps, dtype=torch.bool, device=device
+            )
+            for batch_index, ids in enumerate(encoded):
+                steps = ids.shape[0]
+                plan_ids[batch_index, :steps] = ids.to(device)
+                padding_mask[batch_index, :steps] = False
+
+        tokens = torch.stack(
+            [
+                self.field_scale[field_index]
+                * self.embeddings[field](plan_ids[:, :, field_index])
+                for field_index, field in enumerate(FIELDS)
+            ],
+            dim=0,
+        ).sum(dim=0)
+        return self.norm(tokens), padding_mask

@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from ca_block import CrossAttentionAdaLNZero
 from ca_block.pose_adapter import _rotation_matrix_to_axis_angle
+from ca_block.task_encoder import FIELDS, encode_plan
 
 
 def _aa_to_rotmat(aa: torch.Tensor) -> torch.Tensor:
@@ -132,12 +133,13 @@ class SegmentDataset(Dataset):
 
                 pred_t = torch.from_numpy(pred_np[:T])
                 gt_t   = torch.from_numpy(gt_np[:T])
+                plan_ids = encode_plan(seg["plan"])
 
                 for t in range(T - horizon + 1):
                     self._windows.append((
                         pred_t[t : t + horizon],
                         gt_t[t : t + horizon],
-                        seg["plan"],
+                        plan_ids,
                     ))
 
         print(f"Dataset ready: {len(self._windows)} windows")
@@ -152,8 +154,16 @@ class SegmentDataset(Dataset):
 def collate_fn(batch):
     preds = torch.stack([b[0] for b in batch])  # (B, H, 69)
     gts   = torch.stack([b[1] for b in batch])  # (B, H, 69)
-    plans = [b[2] for b in batch]
-    return preds, gts, plans
+    max_steps = max(b[2].shape[0] for b in batch)
+    plan_ids = torch.zeros(
+        len(batch), max_steps, len(FIELDS), dtype=torch.long
+    )
+    plan_mask = torch.ones(len(batch), max_steps, dtype=torch.bool)
+    for batch_index, (_, _, ids) in enumerate(batch):
+        steps = ids.shape[0]
+        plan_ids[batch_index, :steps] = ids
+        plan_mask[batch_index, :steps] = False
+    return preds, gts, plan_ids, plan_mask
 
 
 def main() -> None:
@@ -226,16 +236,18 @@ def main() -> None:
         model.train()
         total_loss = 0.0
 
-        for pred, gt, plans in loader:
+        for pred, gt, plan_ids, plan_mask in loader:
             pred = pred.to(args.device)  # (B, H, 69)
             gt   = gt.to(args.device)    # (B, H, 69)
+            plan_ids = plan_ids.to(args.device)
+            plan_mask = plan_mask.to(args.device)
 
             with torch.autocast(
                 device_type="cuda",
                 dtype=torch.bfloat16,
                 enabled=pred.device.type == "cuda",
             ):
-                model_out = model(pred, plans)
+                model_out = model(pred, plan_ids, plan_mask)
                 refined   = pred + model_out.pose_delta
                 loss = pose_loss(refined, gt)
 

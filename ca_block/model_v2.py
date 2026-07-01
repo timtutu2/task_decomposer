@@ -76,7 +76,12 @@ class CrossAttentionAdaLNZero(nn.Module):
         nn.init.zeros_(self.delta_head.weight)
         nn.init.zeros_(self.delta_head.bias)
 
-    def forward(self, pose_history: Tensor, task_plans: Sequence[Any]) -> ModelOutput:
+    def forward(
+        self,
+        pose_history: Tensor,
+        task_plans: Sequence[Any] | Tensor,
+        task_padding_mask: Tensor | None = None,
+    ) -> ModelOutput:
         if pose_history.ndim != 3 or pose_history.shape[-1] != self.pose_features:
             raise ValueError(
                 f"pose_history must have shape [batch, time, {self.pose_features}]"
@@ -84,7 +89,9 @@ class CrossAttentionAdaLNZero(nn.Module):
         if len(task_plans) != pose_history.shape[0]:
             raise ValueError("one task plan is required for each pose-history batch item")
         pose = self.pose_projection(pose_history)
-        task_memory, task_mask = self.task_encoder(task_plans, pose.device)
+        task_memory, task_mask = self.task_encoder(
+            task_plans, pose.device, task_padding_mask
+        )
         for block in self.blocks:
             pose = block(pose, task_memory, task_mask)
         delta = self.delta_head(self.output_norm(pose))

@@ -6,7 +6,7 @@ torch = pytest.importorskip("torch")
 
 from ca_block.model_v2 import CrossAttentionAdaLNZero
 from ca_block.pose_adapter import load_hoisdf_history
-from ca_block.task_encoder import normalize_plan
+from ca_block.task_encoder import encode_plan, normalize_plan
 
 
 PLAN = {
@@ -57,3 +57,16 @@ def test_free_text_decomposer_output():
         "2. grasp - target_part: object - hand_part: power_grasp - motion: none"
     )
     assert [row["phase"] for row in plan] == ["approach", "grasp"]
+
+
+def test_preencoded_plan_matches_raw_plan():
+    model = CrossAttentionAdaLNZero(d_model=32, num_heads=4, num_layers=1)
+    history = torch.randn(1, 5, 69)
+    plan_ids = encode_plan(PLAN).unsqueeze(0)
+    plan_mask = torch.zeros(1, plan_ids.shape[1], dtype=torch.bool)
+
+    raw = model(history, [PLAN])
+    encoded = model(history, plan_ids, plan_mask)
+
+    assert torch.allclose(raw.refined_pose_tokens, encoded.refined_pose_tokens)
+    assert torch.allclose(raw.pose_delta, encoded.pose_delta)
