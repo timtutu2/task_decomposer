@@ -178,11 +178,13 @@ def main() -> None:
     parser.add_argument("--device",     default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--batch-size", type=int, default=None,
                         help="Override batch_size from the training config")
+    parser.add_argument("--epochs",     type=int, default=None,
+                        help="Override epochs from the training config")
     args = parser.parse_args()
 
     cfg = json.loads(args.config.read_text())
     horizon    = cfg["horizon"]
-    epochs     = cfg["epochs"]
+    epochs     = args.epochs if args.epochs is not None else cfg["epochs"]
     batch_size = args.batch_size if args.batch_size is not None else cfg["batch_size"]
     lr         = cfg["lr"]
     save_every = cfg["save_every"]
@@ -194,6 +196,8 @@ def main() -> None:
     for k, v in cfg.items():
         if k == "batch_size":
             v = batch_size
+        elif k == "epochs":
+            v = epochs
         print(f"  {k}: {v}")
 
     output.mkdir(parents=True, exist_ok=True)
@@ -211,6 +215,7 @@ def main() -> None:
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     start_epoch = 1
+    completed_epoch = 0
     best_loss   = float("inf")
 
     if args.checkpoint:
@@ -219,6 +224,7 @@ def main() -> None:
             model.load_state_dict(ckpt_data["model"])
             optimizer.load_state_dict(ckpt_data["optimizer"])
             start_epoch = ckpt_data["epoch"] + 1
+            completed_epoch = ckpt_data["epoch"]
             best_loss   = ckpt_data.get("best_loss", float("inf"))
             print(f"Resumed from {args.checkpoint} (epoch {ckpt_data['epoch']}, best_loss={best_loss:.6f})")
         else:
@@ -258,6 +264,7 @@ def main() -> None:
             total_loss += loss.item()
 
         avg_loss = total_loss / len(loader)
+        completed_epoch = epoch
         is_best  = avg_loss < best_loss
 
         if is_best:
@@ -280,6 +287,12 @@ def main() -> None:
             torch.save(bundle, ckpt)
             print(f"  → saved {ckpt}")
 
+    bundle = {
+        "model":      model.state_dict(),
+        "optimizer":  optimizer.state_dict(),
+        "epoch":      completed_epoch,
+        "best_loss":  best_loss,
+    }
     final = output / "final.pt"
     torch.save(bundle, final)
     print(f"Done. Final checkpoint → {final}  (best_loss={best_loss:.6f})")
