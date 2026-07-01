@@ -40,11 +40,22 @@ def _aa_to_rotmat(aa: torch.Tensor) -> torch.Tensor:
 
 
 def _geodesic_loss(pred_aa: torch.Tensor, gt_aa: torch.Tensor) -> torch.Tensor:
-    """Mean geodesic rotation error between two sets of axis-angle vectors (..., 3)."""
+    """Mean geodesic rotation error between two sets of axis-angle vectors (..., 3).
+
+    Uses atan2(sin θ, cos θ) instead of acos(cos θ) to avoid the infinite
+    gradient of acos at ±1 (i.e. when predicted and GT rotations are identical
+    or antipodal), which otherwise causes NaN loss from the very first batch.
+    """
     R_pred = _aa_to_rotmat(pred_aa.float())
     R_gt   = _aa_to_rotmat(gt_aa.float())
-    trace  = (R_pred.transpose(-1, -2) @ R_gt).diagonal(dim1=-2, dim2=-1).sum(-1)
-    return ((trace - 1.0) / 2.0).clamp(-1.0, 1.0).acos().mean()
+    R_diff = R_pred.transpose(-1, -2) @ R_gt
+    # cos θ = (trace − 1) / 2
+    cos_a = ((R_diff.diagonal(dim1=-2, dim2=-1).sum(-1) - 1.0) / 2.0).clamp(-1.0, 1.0)
+    # sin θ = ‖R − Rᵀ‖_F / (2√2)  because R − Rᵀ = 2 sin θ · [axis]×  and ‖[axis]×‖_F = √2
+    # ε inside sqrt keeps the gradient finite when the skew part is zero (identical rotations).
+    diff  = R_diff - R_diff.transpose(-1, -2)
+    sin_a = (diff.pow(2).sum(dim=(-2, -1)) + 1e-12).sqrt() / (2.0 * 2.0 ** 0.5)
+    return torch.atan2(sin_a, cos_a).mean()
 
 PLANS_DIR = ROOT / "preprocess" / "plans"       / "ho3d" / "train"
 PREDS_DIR = ROOT / "preprocess" / "hoisdf_preds" / "ho3d" / "train"
