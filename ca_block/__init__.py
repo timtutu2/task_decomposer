@@ -1,8 +1,8 @@
 """Task-conditioned hand-object pose refinement."""
 
-from .model import (
+from .model_v2 import (
     CrossAttentionAdaLNZero,
-    CrossAttentionAdaLNZeroBlock,
+    CrossAttentionBlock,
     ModelOutput,
 )
 from .pose_adapter import load_hoisdf_history
@@ -10,7 +10,7 @@ from .task_encoder import StructuredTaskEncoder, normalize_plan
 
 __all__ = [
     "CrossAttentionAdaLNZero",
-    "CrossAttentionAdaLNZeroBlock",
+    "CrossAttentionBlock",
     "ModelOutput",
     "StructuredTaskEncoder",
     "load_hoisdf_history",

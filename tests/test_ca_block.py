@@ -4,7 +4,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from ca_block.model import CrossAttentionAdaLNZero
+from ca_block.model_v2 import CrossAttentionAdaLNZero
 from ca_block.pose_adapter import load_hoisdf_history
 from ca_block.task_encoder import normalize_plan
 
