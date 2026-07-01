@@ -161,6 +161,8 @@ def main() -> None:
 
     model = CrossAttentionAdaLNZero().to(args.device)
     state = torch.load(args.checkpoint, map_location=args.device, weights_only=True)
+    if isinstance(state, dict) and "model" in state:
+        state = state["model"]
     model.load_state_dict(state)
     print(f"Loaded checkpoint: {args.checkpoint}")
 

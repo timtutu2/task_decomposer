@@ -63,6 +63,8 @@ def main() -> None:
             state = torch.load(args.checkpoint, map_location=args.device, weights_only=True)
         except TypeError:  # PyTorch < 2.0, as used by some HOISDF environments.
             state = torch.load(args.checkpoint, map_location=args.device)
+        if isinstance(state, dict) and "model" in state:
+            state = state["model"]
         model.load_state_dict(state)
     model.eval()
     with torch.inference_mode():
