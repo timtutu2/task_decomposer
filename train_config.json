@@ -4,6 +4,6 @@
   "batch_size": 64,
   "lr":         1e-4,
   "save_every": 10,
-  "output":     "v2_obj_weight",
+  "output":     "v3_without_pool",
   "obj_weight": 10.0
 }
