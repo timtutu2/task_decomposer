@@ -1,7 +1,7 @@
 {
   "horizon":    5,
   "epochs":     300,
-  "batch_size": 64,
+  "batch_size": 128,
   "lr":         1e-4,
   "save_every": 10,
   "output":     "v3_without_pool",
