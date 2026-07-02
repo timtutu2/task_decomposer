@@ -4,7 +4,7 @@
   "batch_size":   128,
   "lr":           1e-4,
   "save_every":   100,
-  "output":       "v4_geodesic",
-  "rot_weight":   1.0,
+  "output":       "v5_geodesic_balanced",
+  "rot_weight":   0.05,
   "trans_weight": 10.0
 }
